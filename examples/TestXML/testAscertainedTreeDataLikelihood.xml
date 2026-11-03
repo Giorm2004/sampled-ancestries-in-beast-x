@@ -1,0 +1,114 @@
+<?xml version="1.0" standalone="yes"?>
+<beast>
+    <!-- Ascertainment correction in TreeDataLikelihood (value and pre-order gradients), checked
+         against BeagleTreeLikelihood and against numerical derivatives. Synthetic binary covarion
+         data, 12 taxa with tip dates, two partitions; column 1 of each is the all-absent pattern
+         that is conditioned out (excludePatterns), as for per-meaning cognate data.
+         Checked by test.dr.evomodel.treedatalikelihood.AscertainedTreeDataLikelihoodTest. -->
+    <taxa id="taxa">
+        <taxon id="t0"><date value="0" direction="backwards" units="years"/></taxon>
+        <taxon id="t1"><date value="0" direction="backwards" units="years"/></taxon>
+        <taxon id="t2"><date value="0" direction="backwards" units="years"/></taxon>
+        <taxon id="t3"><date value="0" direction="backwards" units="years"/></taxon>
+        <taxon id="t4"><date value="0" direction="backwards" units="years"/></taxon>
+        <taxon id="t5"><date value="0" direction="backwards" units="years"/></taxon>
+        <taxon id="t6"><date value="0" direction="backwards" units="years"/></taxon>
+        <taxon id="t7"><date value="0.4" direction="backwards" units="years"/></taxon>
+        <taxon id="t8"><date value="0.9" direction="backwards" units="years"/></taxon>
+        <taxon id="t9"><date value="1.6" direction="backwards" units="years"/></taxon>
+        <taxon id="t10"><date value="2.1" direction="backwards" units="years"/></taxon>
+        <taxon id="t11"><date value="3.2" direction="backwards" units="years"/></taxon>
+    </taxa>
+    <alignment id="alignment1" dataType="twoStateCovarion">
+        <sequence><taxon idref="t0"/>00111101010001001100011000</sequence>
+        <sequence><taxon idref="t1"/>00000100110010001100010111</sequence>
+        <sequence><taxon idref="t2"/>01000000100010111011001001</sequence>
+        <sequence><taxon idref="t3"/>??????????????????????????</sequence>
+        <sequence><taxon idref="t4"/>00000100100000001100100100</sequence>
+        <sequence><taxon idref="t5"/>01011100000000111110000000</sequence>
+        <sequence><taxon idref="t6"/>00011110111001011100100100</sequence>
+        <sequence><taxon idref="t7"/>00111001000000010010001110</sequence>
+        <sequence><taxon idref="t8"/>01000110100001000010000101</sequence>
+        <sequence><taxon idref="t9"/>00000110110100001001001101</sequence>
+        <sequence><taxon idref="t10"/>01010100110000111110101101</sequence>
+        <sequence><taxon idref="t11"/>00000100110100000100000001</sequence>
+    </alignment>
+    <ascertainedPatterns id="patterns1" from="2">
+        <alignment idref="alignment1"/>
+        <excludePatterns from="1" to="1"/>
+    </ascertainedPatterns>
+    <alignment id="alignment2" dataType="twoStateCovarion">
+        <sequence><taxon idref="t0"/>0011100000100001011011010010000</sequence>
+        <sequence><taxon idref="t1"/>0010000100001111110011000100000</sequence>
+        <sequence><taxon idref="t2"/>0010001110000000000110100010000</sequence>
+        <sequence><taxon idref="t3"/>0100000100000010001110000100010</sequence>
+        <sequence><taxon idref="t4"/>0010000100000100100100101010000</sequence>
+        <sequence><taxon idref="t5"/>0100001000011011000100010010000</sequence>
+        <sequence><taxon idref="t6"/>0010100100011001001101100110101</sequence>
+        <sequence><taxon idref="t7"/>0000000101011011001111110001000</sequence>
+        <sequence><taxon idref="t8"/>0000000101001001001110000110001</sequence>
+        <sequence><taxon idref="t9"/>???????????????????????????????</sequence>
+        <sequence><taxon idref="t10"/>0000010010000000010010000100011</sequence>
+        <sequence><taxon idref="t11"/>0010001111100001011010101001011</sequence>
+    </alignment>
+    <ascertainedPatterns id="patterns2" from="2">
+        <alignment idref="alignment2"/>
+        <excludePatterns from="1" to="1"/>
+    </ascertainedPatterns>
+    <newick id="startingTree" usingDates="true">(t7:6.780744,(t2:6.674852,((t9:1.502064,(t6:2.722706,(t4:1.661010,(t5:1.292304,t8:0.392304):0.368706):1.061696):0.379358):2.913531,((t1:4.181948,t11:0.981948):0.913798,(t3:3.974546,(t0:3.108449,t10:1.008449):0.866097):1.121200):0.919849):0.659257):0.505892);</newick>
+    <treeModel id="treeModel">
+        <newick idref="startingTree"/>
+        <rootHeight><parameter id="treeModel.rootHeight"/></rootHeight>
+        <nodeHeights internalNodes="true"><parameter id="treeModel.internalNodeHeights"/></nodeHeights>
+        <nodeHeights internalNodes="true" rootNode="true"><parameter id="treeModel.allInternalNodeHeights"/></nodeHeights>
+    </treeModel>
+    <arbitraryBranchRates id="branchRates" centerAtOne="false">
+        <rates><parameter id="clock.rates" value="1.0" lower="0"/></rates>
+        <scale><parameter id="clock.rates.scale" value="1.0" lower="0"/></scale>
+        <location><parameter id="clock.rates.location" value="0.35" lower="0"/></location>
+        <treeModel idref="treeModel"/>
+    </arbitraryBranchRates>
+    <binaryCovarionModel id="covarion" version="1">
+        <frequencies><parameter id="covarion.frequencies" value="0.7 0.3"/></frequencies>
+        <hiddenFrequencies><parameter id="covarion.hiddenFrequencies" value="0.6 0.4"/></hiddenFrequencies>
+        <alpha><parameter id="covarion.alpha" value="0.25"/></alpha>
+        <switchingRate><parameter id="covarion.switchingRate" value="0.8"/></switchingRate>
+    </binaryCovarionModel>
+    <siteModel id="siteModel1"><substitutionModel><binaryCovarionModel idref="covarion"/></substitutionModel>
+        <mutationRate><parameter id="mu1" value="1.3"/></mutationRate></siteModel>
+    <siteModel id="siteModel2"><substitutionModel><binaryCovarionModel idref="covarion"/></substitutionModel>
+        <mutationRate><parameter id="mu2" value="0.7"/></mutationRate>
+        <gammaShape gammaCategories="4"><parameter id="alpha2" value="0.6"/></gammaShape></siteModel>
+    <treeDataLikelihood id="tdl1" useAmbiguities="true" usePreOrder="true" scalingScheme="always">
+        <patterns idref="patterns1"/>
+        <treeModel idref="treeModel"/>
+        <siteModel idref="siteModel1"/>
+        <arbitraryBranchRates idref="branchRates"/>
+    </treeDataLikelihood>
+    <treeLikelihood id="old1" useAmbiguities="true">
+        <patterns idref="patterns1"/>
+        <treeModel idref="treeModel"/>
+        <siteModel idref="siteModel1"/>
+        <arbitraryBranchRates idref="branchRates"/>
+    </treeLikelihood>
+    <report>partition 1: TreeDataLikelihood ln L = <treeDataLikelihood idref="tdl1"/>
+        BeagleTreeLikelihood (reference) ln L = <treeLikelihood idref="old1"/></report>
+    <branchRateGradient id="rateGradient1" traitName="covarion"><treeDataLikelihood idref="tdl1"/></branchRateGradient>
+    <nodeHeightGradient id="heightGradient1" traitName="covarion"><treeDataLikelihood idref="tdl1"/></nodeHeightGradient>
+    <treeDataLikelihood id="tdl2" useAmbiguities="true" usePreOrder="true" scalingScheme="always">
+        <patterns idref="patterns2"/>
+        <treeModel idref="treeModel"/>
+        <siteModel idref="siteModel2"/>
+        <arbitraryBranchRates idref="branchRates"/>
+    </treeDataLikelihood>
+    <treeLikelihood id="old2" useAmbiguities="true">
+        <patterns idref="patterns2"/>
+        <treeModel idref="treeModel"/>
+        <siteModel idref="siteModel2"/>
+        <arbitraryBranchRates idref="branchRates"/>
+    </treeLikelihood>
+    <report>partition 2: TreeDataLikelihood ln L = <treeDataLikelihood idref="tdl2"/>
+        BeagleTreeLikelihood (reference) ln L = <treeLikelihood idref="old2"/></report>
+    <branchRateGradient id="rateGradient2" traitName="covarion"><treeDataLikelihood idref="tdl2"/></branchRateGradient>
+    <nodeHeightGradient id="heightGradient2" traitName="covarion"><treeDataLikelihood idref="tdl2"/></nodeHeightGradient>
+</beast>

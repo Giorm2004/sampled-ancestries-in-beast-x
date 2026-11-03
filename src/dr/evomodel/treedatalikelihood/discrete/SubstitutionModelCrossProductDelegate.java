@@ -27,6 +27,7 @@
 
 package dr.evomodel.treedatalikelihood.discrete;
 
+import dr.evolution.alignment.AscertainedSitePatterns;
 import dr.evolution.tree.NodeRef;
 import dr.evolution.tree.Tree;
 import dr.evolution.tree.TreeTrait;
@@ -58,6 +59,11 @@ public class SubstitutionModelCrossProductDelegate extends AbstractBeagleGradien
                                                  int stateCount) {
 
         super(name, tree, likelihoodDelegate);
+        if (patternList instanceof AscertainedSitePatterns) {
+            throw new IllegalArgumentException("Substitution-model gradients do not include the ascertainment "
+                    + "correction (only branch-length/rate and node-height gradients do); sample these "
+                    + "parameters with Metropolis-Hastings operators");
+        }
         this.name = name;
         this.tree = tree;
         this.stateCount = stateCount;

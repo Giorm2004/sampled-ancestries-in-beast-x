@@ -29,9 +29,11 @@
 package dr.evomodel.treedatalikelihood.discrete;
 
 import beagle.Beagle;
+import dr.evolution.alignment.AscertainedSitePatterns;
 import dr.evolution.tree.NodeRef;
 import dr.evolution.tree.Tree;
 import dr.evomodel.branchratemodel.DifferentiableBranchRates;
+import dr.evomodel.treedatalikelihood.AscertainmentCorrection;
 import dr.evomodel.treedatalikelihood.BeagleDataLikelihoodDelegate;
 
 import java.util.Arrays;
@@ -122,6 +124,13 @@ public class DiscreteTraitNodeHeightDelegate extends DiscreteTraitBranchRateDele
 
             double[] tmpPatternCacheOne = new double[patternCount];
             double[] tmpPatternCacheTwo = new double[patternCount];
+            double[] nodePatternHessian = new double[patternCount];
+
+            // ascertainment: c_k = a_k p_k / R and the total weight W (AscertainmentCorrection)
+            final double[] ascertainment = patternList instanceof AscertainedSitePatterns
+                    ? AscertainmentCorrection.coefficients((AscertainedSitePatterns) patternList,
+                    likelihoodDelegate.getSiteLogLikelihoods()) : null;
+            final double totalWeight = AscertainmentCorrection.totalWeight(likelihoodDelegate.getPatternWeights());
 
             for (int i = 0; i < tree.getNodeCount() - 1; i++) {
                 beagle.getTransitionMatrix(evolutionaryProcessDelegate.getInfinitesimalMatrixBufferIndex(i), Qi);
@@ -163,7 +172,7 @@ public class DiscreteTraitNodeHeightDelegate extends DiscreteTraitBranchRateDele
                         sisterBranchesSecondDerivatives[i], 1, 2 * branchRates.getBranchRate(tree, nodeJ) * branchRates.getBranchRate(tree, nodeK),
                         tmpPatternCacheTwo);
 
-                second[i] = getVectorPatternReduction(tmpPatternCacheTwo);
+                System.arraycopy(tmpPatternCacheTwo, 0, nodePatternHessian, 0, patternCount);
 
 
                 if (!tree.isRoot(nodeI)) {
@@ -190,8 +199,29 @@ public class DiscreteTraitNodeHeightDelegate extends DiscreteTraitBranchRateDele
                             1, -2 * branchRates.getBranchRate(tree, nodeI) * branchRates.getBranchRate(tree, nodeK),
                             tmpPatternCacheTwo);
 
-                    second[i] +=  getVectorPatternReduction(tmpPatternCacheTwo);
+                    for (int k = 0; k < patternCount; k++) {
+                        nodePatternHessian[k] += tmpPatternCacheTwo[k];
+                    }
 
+                }
+
+                second[i] = getVectorPatternReduction(nodePatternHessian);
+
+                if (ascertainment != null) {
+                    // per-pattern first derivative wrt this node height, then the correction's curvature
+                    // -W (sum_k c_k (H_k + g_k^2) - (sum_k c_k g_k)^2), see AscertainmentCorrection
+                    double cg = 0.0;
+                    double chg = 0.0;
+                    for (int k = 0; k < patternCount; k++) {
+                        double g = branchPatternGradient[getParameterIndex(nodeJ, tree)][k] * branchRates.getBranchRate(tree, nodeJ)
+                                + branchPatternGradient[getParameterIndex(nodeK, tree)][k] * branchRates.getBranchRate(tree, nodeK);
+                        if (!tree.isRoot(nodeI)) {
+                            g -= branchPatternGradient[getParameterIndex(nodeI, tree)][k] * branchRates.getBranchRate(tree, nodeI);
+                        }
+                        cg += ascertainment[k] * g;
+                        chg += ascertainment[k] * (nodePatternHessian[k] + g * g);
+                    }
+                    second[i] -= totalWeight * (chg - cg * cg);
                 }
 
             }

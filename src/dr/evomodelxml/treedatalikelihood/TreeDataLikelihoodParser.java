@@ -27,6 +27,7 @@
 
 package dr.evomodelxml.treedatalikelihood;
 
+import dr.evolution.alignment.AscertainedSitePatterns;
 import dr.evolution.alignment.PatternList;
 import dr.evolution.alignment.Patterns;
 import dr.evolution.tree.Tree;
@@ -130,6 +131,16 @@ public class TreeDataLikelihoodParser extends AbstractXMLObjectParser {
             }
         }
 
+        boolean ascertained = false;
+        for (PatternList patternList : patternLists) {
+            ascertained |= patternList instanceof AscertainedSitePatterns;
+        }
+        if (ascertained && useBeagle3MultiPartition) {
+            // the ascertainment correction is applied per partition in BeagleDataLikelihoodDelegate
+            Logger.getLogger("dr.evomodel").info("  ascertained partitions: using one BEAGLE instance per partition");
+            useBeagle3MultiPartition = false;
+        }
+
         boolean useJava = Boolean.parseBoolean(System.getProperty("java.only", "false"));
         if (useJava) {
             logger.warning("  Java-only computation is not available - ignoring this option.");
@@ -206,9 +217,16 @@ public class TreeDataLikelihoodParser extends AbstractXMLObjectParser {
             PatternList partitionPatterns = patternLists.get(i);
             // can't divide up a partition by more than the number of patterns...
             int bic = Math.min(partitionPatterns.getPatternCount(), beagleInstanceCount);
+            // an ascertained partition is kept whole and unwrapped: its correction needs every pattern
+            final boolean keepWhole = partitionPatterns instanceof AscertainedSitePatterns;
+            if (keepWhole && bic > 1) {
+                logger.info("  ascertained partition " + (i + 1) + " is not divided between BEAGLE instances");
+                bic = 1;
+            }
 
             for (int j = 0; j < bic; j++) {
-                PatternList subPatterns = new Patterns(partitionPatterns, j, bic, partitionPatterns.areUnique());
+                PatternList subPatterns = keepWhole ? partitionPatterns
+                        : new Patterns(partitionPatterns, j, bic, partitionPatterns.areUnique());
                 DataLikelihoodDelegate dataLikelihoodDelegate = new BeagleDataLikelihoodDelegate(
                         treeModel,
                         subPatterns,

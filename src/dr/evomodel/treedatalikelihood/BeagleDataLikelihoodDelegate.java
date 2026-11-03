@@ -28,6 +28,7 @@
 package dr.evomodel.treedatalikelihood;
 
 import beagle.*;
+import dr.evolution.alignment.AscertainedSitePatterns;
 import dr.evolution.alignment.PatternList;
 import dr.evolution.alignment.UncertainSiteList;
 import dr.evolution.datatype.DataType;
@@ -943,6 +944,14 @@ public class BeagleDataLikelihoodDelegate extends AbstractModel implements
             }
         }*/
 
+        if (patternList instanceof AscertainedSitePatterns && !Double.isNaN(logL) && !Double.isInfinite(logL)) {
+            // condition on the ascertainment event: sum_k w_k (l_k - log R), see AscertainmentCorrection
+            double logR = AscertainmentCorrection.logProbability((AscertainedSitePatterns) patternList,
+                    getSiteLogLikelihoods());
+            logL = Double.isNaN(logR) ? Double.NEGATIVE_INFINITY
+                    : logL - logR * AscertainmentCorrection.totalWeight(patternWeights);
+        }
+
         if (Double.isNaN(logL) || Double.isInfinite(logL)) {
 
             if (DEBUG) {
@@ -1015,6 +1024,11 @@ public class BeagleDataLikelihoodDelegate extends AbstractModel implements
         //beagle.getSiteLogLikelihoods(patternLogLikelihoods);
 
         return logL;
+    }
+
+    /** The pattern weights in use (patternList's, or those set by a site-assignment indicator). */
+    public double[] getPatternWeights() {
+        return patternWeights;
     }
 
     public double[] getSiteLogLikelihoods(){
