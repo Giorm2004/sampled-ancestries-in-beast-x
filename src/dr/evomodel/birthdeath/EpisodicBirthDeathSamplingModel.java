@@ -27,6 +27,7 @@
 
 package dr.evomodel.birthdeath;
 
+import dr.evomodel.tree.SampledAncestorTrees;
 import dr.evomodel.tree.TreeModel;
 import dr.evolution.tree.NodeRef;
 import dr.evolution.tree.Tree;
@@ -572,10 +573,9 @@ public class EpisodicBirthDeathSamplingModel extends BirthDeathModel implements 
         return sampledAncestors;
     }
 
-    /** A tip at height > 0 whose parent is at the same height is a sampled ancestor (the parent is its "fake" node). */
+    /** A tip at height > 0 whose parent is at the same height is a sampled ancestor (SampledAncestorTrees). */
     public static boolean isSampledAncestor(Tree tree, NodeRef node) {
-        return tree.isExternal(node) && !tree.isRoot(node) && tree.getNodeHeight(node) > 0.0
-                && tree.getNodeHeight(tree.getParent(node)) == tree.getNodeHeight(node);
+        return SampledAncestorTrees.isSampledAncestor(tree, node);
     }
 
     /**
@@ -599,17 +599,9 @@ public class EpisodicBirthDeathSamplingModel extends BirthDeathModel implements 
         return count;
     }
 
-    /** An internal node with a sampled-ancestor child. */
+    /** An internal node with a sampled-ancestor child (SampledAncestorTrees). */
     public static boolean isFakeNode(Tree tree, NodeRef node) {
-        if (tree.isExternal(node)) {
-            return false;
-        }
-        for (int i = 0; i < tree.getChildCount(node); i++) {
-            if (isSampledAncestor(tree, tree.getChild(node, i))) {
-                return true;
-            }
-        }
-        return false;
+        return SampledAncestorTrees.isFake(tree, node);
     }
 
     /**
