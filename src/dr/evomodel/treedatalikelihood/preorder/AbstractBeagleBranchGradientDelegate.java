@@ -28,9 +28,11 @@
 package dr.evomodel.treedatalikelihood.preorder;
 
 import beagle.Beagle;
+import dr.evolution.alignment.AscertainedSitePatterns;
 import dr.evolution.tree.NodeRef;
 import dr.evolution.tree.Tree;
 import dr.evolution.tree.TreeTrait;
+import dr.evomodel.treedatalikelihood.AscertainmentCorrection;
 import dr.evomodel.treedatalikelihood.BeagleDataLikelihoodDelegate;
 
 /**
@@ -78,6 +80,12 @@ public abstract class AbstractBeagleBranchGradientDelegate extends AbstractBeagl
             }
         }
 
+        if (patternList instanceof AscertainedSitePatterns) {
+            getAscertainedNodeDerivatives((AscertainedSitePatterns) patternList, postBufferIndices,
+                    preBufferIndices, firstDervIndices, secondDeriveIndices, first, second);
+            return;
+        }
+
         double[] firstSquared = (second != null) ? new double[second.length] : null;
 
         beagle.calculateEdgeDifferentials(postBufferIndices, preBufferIndices,
@@ -96,6 +104,54 @@ public abstract class AbstractBeagleBranchGradientDelegate extends AbstractBeagl
 
         if (DEBUG) {
             checkReduction(first);
+        }
+    }
+
+    /**
+     * Derivatives of the ascertainment-corrected log likelihood (see AscertainmentCorrection): from
+     * BEAGLE's per-pattern derivatives d_k = dl_k/dt and s_k = (d^2 L_k/dt^2) / L_k,
+     *     first  = sum_k (w_k - W c_k) d_k,
+     *     second = sum_k w_k (s_k - d_k^2) - W (sum_k c_k s_k - (sum_k c_k d_k)^2).
+     */
+    private void getAscertainedNodeDerivatives(AscertainedSitePatterns patterns, int[] postBufferIndices,
+                                               int[] preBufferIndices, int[] firstDervIndices,
+                                               int[] secondDeriveIndices, double[] first, double[] second) {
+        final int count = postBufferIndices.length;
+        final double[] weights = likelihoodDelegate.getPatternWeights();
+        final double totalWeight = AscertainmentCorrection.totalWeight(weights);
+        final double[] c = AscertainmentCorrection.coefficients(patterns, likelihoodDelegate.getSiteLogLikelihoods());
+
+        final double[] d = new double[count * patternCount];
+        beagle.calculateEdgeDifferentials(postBufferIndices, preBufferIndices,
+                firstDervIndices, new int[] { 0 }, count, d, null, null);
+
+        double[] s = null;
+        if (second != null) {
+            s = new double[count * patternCount];
+            beagle.calculateEdgeDifferentials(postBufferIndices, preBufferIndices,
+                    secondDeriveIndices, new int[] { 0 }, count, s, null, null);
+        }
+
+        for (int u = 0; u < count; u++) {
+            final int offset = u * patternCount;
+            double sum = 0.0;
+            double cd = 0.0;
+            for (int k = 0; k < patternCount; k++) {
+                sum += (weights[k] - totalWeight * c[k]) * d[offset + k];
+                cd += c[k] * d[offset + k];
+            }
+            if (first != null) {
+                first[u] = sum;
+            }
+            if (second != null) {
+                double curvature = 0.0;
+                double cs = 0.0;
+                for (int k = 0; k < patternCount; k++) {
+                    curvature += weights[k] * (s[offset + k] - d[offset + k] * d[offset + k]);
+                    cs += c[k] * s[offset + k];
+                }
+                second[u] = curvature - totalWeight * (cs - cd * cd);
+            }
         }
     }
 
