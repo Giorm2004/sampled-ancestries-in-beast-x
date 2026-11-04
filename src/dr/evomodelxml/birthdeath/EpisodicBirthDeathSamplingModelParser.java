@@ -61,6 +61,7 @@ public class EpisodicBirthDeathSamplingModelParser extends AbstractXMLObjectPars
     public static final String REPRODUCTIVE_NUMBER = "reproductiveNumber";
     public static final String BECOME_UNINFECTIOUS_RATE = "becomeUninfectiousRate";
     public static final String SAMPLING_PROPORTION = "samplingProportion";
+    public static final String SAMPLED_ANCESTORS = "sampledAncestors";
 
     public String getParserName() {
         return EPISODIC_BIRTH_DEATH_SAMPLING_MODEL;
@@ -171,6 +172,7 @@ public class EpisodicBirthDeathSamplingModelParser extends AbstractXMLObjectPars
 
 
         model.setupGradientFlags(gradientFlags);
+        model.setSampledAncestors(xo.getAttribute(SAMPLED_ANCESTORS, false));
 
         if (breakPoints != null) {
             model.setupTimeline(breakPoints);
@@ -186,6 +188,9 @@ public class EpisodicBirthDeathSamplingModelParser extends AbstractXMLObjectPars
                 : R0Parameter != null ? "compound" : "raw"));
         if (breakPoints != null) {
             Logger.getLogger("dr.evomodel").info("\tBreak points: parameter " + breakPoints.getId());
+        }
+        if (model.hasSampledAncestors()) {
+            Logger.getLogger("dr.evomodel").info("\tSampled ancestors allowed (BDSKY terms, labelling log 2 per non-fake internal node)");
         }
 
         return model;
@@ -205,6 +210,7 @@ public class EpisodicBirthDeathSamplingModelParser extends AbstractXMLObjectPars
 
     private final XMLSyntaxRule[] rules = {
             AttributeRule.newBooleanRule(CONDITION, true),
+            AttributeRule.newBooleanRule(SAMPLED_ANCESTORS, true),
             new XORRule(new XMLSyntaxRule[]{
                     new ElementRule(BIRTH_RATE,
                             new XMLSyntaxRule[]{

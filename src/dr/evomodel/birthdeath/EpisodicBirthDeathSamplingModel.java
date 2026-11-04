@@ -27,6 +27,7 @@
 
 package dr.evomodel.birthdeath;
 
+import dr.evomodel.tree.TreeModel;
 import dr.evolution.tree.NodeRef;
 import dr.evolution.tree.Tree;
 import dr.evolution.util.Taxon;
@@ -72,6 +73,8 @@ public class EpisodicBirthDeathSamplingModel extends BirthDeathModel implements 
     // optional sampled break points (setupTimeline(Parameter)); null for a fixed grid
     private Parameter breakPointsParameter = null;
     private boolean timelineValid = true;
+    private boolean sampledAncestors = false;
+    private int currentSegment = 0;
     double gridEnd;
     double[] modelStartTimes = null;
 
@@ -560,6 +563,97 @@ public class EpisodicBirthDeathSamplingModel extends BirthDeathModel implements 
         return nLineages * (logQ_old - logQ_young);
     }
 
+    /** Trees may contain sampled ancestors (tips on zero-length branches, BEAST 2 SA style); see logSampledAncestorTerms. */
+    public void setSampledAncestors(boolean sampledAncestors) {
+        this.sampledAncestors = sampledAncestors;
+    }
+
+    public boolean hasSampledAncestors() {
+        return sampledAncestors;
+    }
+
+    /** A tip at height > 0 whose parent is at the same height is a sampled ancestor (the parent is its "fake" node). */
+    public static boolean isSampledAncestor(Tree tree, NodeRef node) {
+        return tree.isExternal(node) && !tree.isRoot(node) && tree.getNodeHeight(node) > 0.0
+                && tree.getNodeHeight(tree.getParent(node)) == tree.getNodeHeight(node);
+    }
+
+    /**
+     * Makes input sampled ancestors exact: a tip whose parent is within tolerance above it (a zero-length branch
+     * in the input newick, up to rounding from rebuilding heights) gets its parent moved onto it. Operators keep
+     * sampled ancestors exact afterwards. Returns the number of sampled ancestors.
+     */
+    public static int snapSampledAncestors(TreeModel tree, double tolerance) {
+        int count = 0;
+        for (int i = 0; i < tree.getExternalNodeCount(); i++) {
+            NodeRef tip = tree.getExternalNode(i);
+            if (tree.isRoot(tip) || tree.getNodeHeight(tip) <= 0.0) {
+                continue;
+            }
+            double gap = tree.getNodeHeight(tree.getParent(tip)) - tree.getNodeHeight(tip);
+            if (gap >= 0.0 && gap < tolerance) {
+                tree.setNodeHeight(tree.getParent(tip), tree.getNodeHeight(tip));
+                count++;
+            }
+        }
+        return count;
+    }
+
+    /** An internal node with a sampled-ancestor child. */
+    public static boolean isFakeNode(Tree tree, NodeRef node) {
+        if (tree.isExternal(node)) {
+            return false;
+        }
+        for (int i = 0; i < tree.getChildCount(node); i++) {
+            if (isSampledAncestor(tree, tree.getChild(node, i))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Terms that make the interval likelihood (EfficientBirthDeathLikelihood) equal BEAST 2's sampled-ancestor
+     * birth-death skyline (BDSKY BirthDeathSkylineModel with removalProbability; Gavryushkina et al. 2014).
+     *
+     * The interval loop scores a sampled ancestor at time t -- a sampling and a branching at the same time, with a
+     * zero-length interval between them, so their logQ terms cancel -- as log(psi (r + (1 - r) p(t))) + log(lambda);
+     * a degree-two node contributes log((1 - r) psi) instead. Per sampled ancestor this adds
+     *     log(1 - r) - log(r + (1 - r) p(t)) - log(lambda)
+     * (segment of t), and once per tree BDSKY's labelling term log(2) x (non-fake internal nodes)
+     * = log(2) x (tips - sampled ancestors - 1), which varies with the number of sampled ancestors.
+     * Returns 0 unless sampledAncestors is set.
+     */
+    public double logSampledAncestorTerms(Tree tree) {
+        if (!sampledAncestors) {
+            return 0.0;
+        }
+        int count = 0;
+        double logL = 0.0;
+        for (int i = 0; i < tree.getExternalNodeCount(); i++) {
+            NodeRef tip = tree.getExternalNode(i);
+            if (isSampledAncestor(tree, tip)) {
+                count++;
+                final double t = tree.getNodeHeight(tip);
+                segmentAt(t);
+                logL += Math.log(1.0 - r) - Math.log(r + (1.0 - r) * p(currentSegment, t)) - Math.log(lambda);
+            }
+        }
+        return logL + Math.log(2.0) * (tree.getExternalNodeCount() - count - 1);
+    }
+
+    /** Sets the model values (A, B, lambda, ...) for the segment containing t; the older segment on a break point. */
+    private void segmentAt(double t) {
+        refreshTimeline();
+        int model = 0;
+        updateLikelihoodModelValues(0);
+        while (model < numIntervals - 1 && t >= modelStartTimes[model + 1]) {
+            ++model;
+            updateLikelihoodModelValues(model);
+        }
+        currentSegment = model;
+    }
+
     /**
      * d/dh of the tree log density for an internal node at height h. The node closes a likelihood interval
      * with n lineages and opens one with n - 1 (the origin lineage above the root), so of the interval
@@ -568,20 +662,18 @@ public class EpisodicBirthDeathSamplingModel extends BirthDeathModel implements 
      * older segment). log(lambda_m) and the tip terms do not depend on h. With
      * logQ_m(t) = A tau + log 4 - 2 log((1 + B) e^(A tau) + 1 - B), tau = t - s_m:
      *     d logQ_m / dt = A - 2 A (1 + B) e^(A tau) / ((1 + B) e^(A tau) + 1 - B).
-     * Not valid for sampled-ancestor (degree-two) nodes; jumps where a node crosses a break point with
+     * Sampled ancestors do not change this for the other nodes (their terms depend only on the tip's time); a
+     * fake node is pinned to its sampled ancestor and gets 0. Jumps where a node crosses a break point with
      * sampling probability > 0 are not differentiated.
      */
     @Override
     public double getNodeHeightGradient(Tree tree, NodeRef node) {
-        final double t = tree.getNodeHeight(node);
-        refreshTimeline();
-        int model = 0;
-        updateLikelihoodModelValues(0);
-        while (model < numIntervals - 1 && t >= modelStartTimes[model + 1]) {
-            ++model;
-            updateLikelihoodModelValues(model);
+        if (sampledAncestors && isFakeNode(tree, node)) {
+            return 0.0;     // pinned to its sampled ancestor's height: not a free coordinate
         }
-        final double eAt = Math.exp(A * (t - modelStartTimes[model]));
+        final double t = tree.getNodeHeight(node);
+        segmentAt(t);
+        final double eAt = Math.exp(A * (t - modelStartTimes[currentSegment]));
         return A - 2.0 * A * (1.0 + B) * eAt / g1(eAt);
     }
 

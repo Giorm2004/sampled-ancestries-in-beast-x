@@ -38,6 +38,7 @@ import dr.math.MathUtils;
 import dr.util.Timer;
 
 import java.util.Set;
+import java.util.logging.Logger;
 
 /**
  * @author Andy Magee
@@ -69,6 +70,11 @@ public class EfficientBirthDeathLikelihood extends BirthDeathLikelihood implemen
 
         if (!(tree instanceof EmpiricalTreeDistributionModel)) {
             fixTimes();
+            if (birthDeathModel instanceof EpisodicBirthDeathSamplingModel
+                    && ((EpisodicBirthDeathSamplingModel) birthDeathModel).hasSampledAncestors()) {
+                int count = EpisodicBirthDeathSamplingModel.snapSampledAncestors((TreeModel) tree, TOLERANCE * 1e-4);
+                Logger.getLogger("dr.evomodel").info("  " + count + " sampled ancestor(s) in the starting tree");
+            }
         }
 
         treeIntervals = new BigFastTreeIntervals((TreeModel)tree);
@@ -150,6 +156,10 @@ public class EfficientBirthDeathLikelihood extends BirthDeathLikelihood implemen
         logL += birthDeathModel.processOrigin(currentModelSegment, treeIntervals.getTotalDuration());
 
         logL += birthDeathModel.logConditioningProbability(currentModelSegment);
+
+        if (birthDeathModel instanceof EpisodicBirthDeathSamplingModel) {
+            logL += ((EpisodicBirthDeathSamplingModel) birthDeathModel).logSampledAncestorTerms(tree);
+        }
 
         if (MEASURE_RUN_TIME) {
             timer.stop();
