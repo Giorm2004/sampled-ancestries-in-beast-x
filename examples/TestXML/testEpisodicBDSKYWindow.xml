@@ -1,0 +1,67 @@
+<?xml version="1.0" standalone="yes"?>
+<beast>
+    <!-- Episodic birth-death sampling model in BDSKY's epidemiological parameterisation with a removal
+         probability (reproductiveNumber, becomeUninfectiousRate, samplingProportion, treatmentProbability)
+         and sampled sampling-window break points, as in the IE-CoR windowed BDSKY model: sampling
+         proportion 0 / s / 0 in [0, b1), [b1, b2), [b2, origin), rho at present, r = 0. Three parameter sets
+         on one dated tree (8 tips at present, 6 ancient tips inside the window). Checked against BEAST 2
+         BDSKY 1.5.1 by test.dr.evomodel.birthdeath.EpisodicBDSKYWindowTest. -->
+    <taxa id="taxa">
+        <taxon id="m0"><date value="0.0" direction="backwards" units="years"/></taxon>
+        <taxon id="m1"><date value="0.0" direction="backwards" units="years"/></taxon>
+        <taxon id="m2"><date value="0.0" direction="backwards" units="years"/></taxon>
+        <taxon id="m3"><date value="0.0" direction="backwards" units="years"/></taxon>
+        <taxon id="m4"><date value="0.0" direction="backwards" units="years"/></taxon>
+        <taxon id="m5"><date value="0.0" direction="backwards" units="years"/></taxon>
+        <taxon id="m6"><date value="0.0" direction="backwards" units="years"/></taxon>
+        <taxon id="m7"><date value="0.0" direction="backwards" units="years"/></taxon>
+        <taxon id="a0"><date value="0.3" direction="backwards" units="years"/></taxon>
+        <taxon id="a1"><date value="0.9" direction="backwards" units="years"/></taxon>
+        <taxon id="a2"><date value="1.5" direction="backwards" units="years"/></taxon>
+        <taxon id="a3"><date value="2.2" direction="backwards" units="years"/></taxon>
+        <taxon id="a4"><date value="3.0" direction="backwards" units="years"/></taxon>
+        <taxon id="a5"><date value="3.45" direction="backwards" units="years"/></taxon>
+    </taxa>
+    <newick id="tree0" usingDates="true">(a2:6.357000000000,((m2:6.369000000000,(a0:5.203000000000,(m5:4.374000000000,(a3:1.544000000000,a4:0.744000000000):0.630000000000):1.129000000000):0.866000000000):0.647000000000,((m6:5.433000000000,(a1:3.726000000000,a5:1.176000000000):0.807000000000):1.159000000000,(m0:2.691000000000,((m3:0.375000000000,m4:0.375000000000):1.618000000000,(m1:1.184000000000,m7:1.184000000000):0.809000000000):0.698000000000):3.901000000000):0.424000000000):0.841000000000);</newick>
+    <treeModel id="treeModel"><newick idref="tree0"/>
+        <rootHeight><parameter id="treeModel.rootHeight"/></rootHeight>
+        <nodeHeights internalNodes="true"><parameter id="treeModel.internalNodeHeights"/></nodeHeights>
+        <nodeHeights internalNodes="true" rootNode="true"><parameter id="treeModel.allInternalNodeHeights"/></nodeHeights>
+    </treeModel>
+    <episodicBirthDeathSamplingModel id="bdsky1" units="years" conditionOnSurvival="true">
+        <reproductiveNumber><parameter id="R0.1" value="1.5"/></reproductiveNumber>
+        <becomeUninfectiousRate><parameter id="delta.1" value="2.0"/></becomeUninfectiousRate>
+        <samplingProportion><parameter id="s.1" value="0.0 0.1 0.0"/></samplingProportion>
+        <treatmentProbability><parameter id="r.1" value="0.0 0.0 0.0"/></treatmentProbability>
+        <samplingProbability><parameter id="rho.1" value="0.2 0.0 0.0"/></samplingProbability>
+        <origin><parameter id="origin.1" value="9.2"/></origin>
+        <breakPoints><parameter id="window.1" value="0.02 4.401"/></breakPoints>
+    </episodicBirthDeathSamplingModel>
+    <birthDeathLikelihood id="bd1" useNewLoop="true"><model><episodicBirthDeathSamplingModel idref="bdsky1"/></model>
+        <tree><treeModel idref="treeModel"/></tree></birthDeathLikelihood>
+    <birthDeathLikelihoodGradient id="grad1" wrtParameter="nodeHeight" useNewLoop="true"><birthDeathLikelihood idref="bd1"/><treeModel idref="treeModel"/></birthDeathLikelihoodGradient>
+    <episodicBirthDeathSamplingModel id="bdsky2" units="years" conditionOnSurvival="true">
+        <reproductiveNumber><parameter id="R0.2" value="1.2"/></reproductiveNumber>
+        <becomeUninfectiousRate><parameter id="delta.2" value="0.7"/></becomeUninfectiousRate>
+        <samplingProportion><parameter id="s.2" value="0.0 0.35 0.0"/></samplingProportion>
+        <treatmentProbability><parameter id="r.2" value="0.0 0.0 0.0"/></treatmentProbability>
+        <samplingProbability><parameter id="rho.2" value="0.05 0.0 0.0"/></samplingProbability>
+        <origin><parameter id="origin.2" value="11.0"/></origin>
+        <breakPoints><parameter id="window.2" value="0.05 3.6"/></breakPoints>
+    </episodicBirthDeathSamplingModel>
+    <birthDeathLikelihood id="bd2" useNewLoop="true"><model><episodicBirthDeathSamplingModel idref="bdsky2"/></model>
+        <tree><treeModel idref="treeModel"/></tree></birthDeathLikelihood>
+    <birthDeathLikelihoodGradient id="grad2" wrtParameter="nodeHeight" useNewLoop="true"><birthDeathLikelihood idref="bd2"/><treeModel idref="treeModel"/></birthDeathLikelihoodGradient>
+    <episodicBirthDeathSamplingModel id="bdsky3" units="years" conditionOnSurvival="true">
+        <reproductiveNumber><parameter id="R0.3" value="2.4"/></reproductiveNumber>
+        <becomeUninfectiousRate><parameter id="delta.3" value="1.1"/></becomeUninfectiousRate>
+        <samplingProportion><parameter id="s.3" value="0.0 0.02 0.0"/></samplingProportion>
+        <treatmentProbability><parameter id="r.3" value="0.0 0.0 0.0"/></treatmentProbability>
+        <samplingProbability><parameter id="rho.3" value="0.6 0.0 0.0"/></samplingProbability>
+        <origin><parameter id="origin.3" value="8.7"/></origin>
+        <breakPoints><parameter id="window.3" value="0.03 5.2"/></breakPoints>
+    </episodicBirthDeathSamplingModel>
+    <birthDeathLikelihood id="bd3" useNewLoop="true"><model><episodicBirthDeathSamplingModel idref="bdsky3"/></model>
+        <tree><treeModel idref="treeModel"/></tree></birthDeathLikelihood>
+    <birthDeathLikelihoodGradient id="grad3" wrtParameter="nodeHeight" useNewLoop="true"><birthDeathLikelihood idref="bd3"/><treeModel idref="treeModel"/></birthDeathLikelihoodGradient>
+</beast>

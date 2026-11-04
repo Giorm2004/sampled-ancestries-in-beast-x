@@ -27,6 +27,7 @@
 
 package dr.evomodel.birthdeath;
 
+import dr.evolution.tree.NodeRef;
 import dr.evolution.tree.Tree;
 import dr.evolution.util.Taxon;
 import dr.inference.model.Parameter;
@@ -68,6 +69,9 @@ public class EpisodicBirthDeathSamplingModel extends BirthDeathModel implements 
 
     // there are numIntervals intervalStarts, implicitly intervalStarts[-1] == 0
     int numIntervals;
+    // optional sampled break points (setupTimeline(Parameter)); null for a fixed grid
+    private Parameter breakPointsParameter = null;
+    private boolean timelineValid = true;
     double gridEnd;
     double[] modelStartTimes = null;
 
@@ -336,6 +340,37 @@ public class EpisodicBirthDeathSamplingModel extends BirthDeathModel implements 
         this.gradientFlags = gradientFlags;
     }
 
+    /**
+     * Interval start times from a parameter of dimension numIntervals - 1 (the break points, ascending,
+     * all > 0; the first interval starts at 0), which may be sampled. The start times are re-read from the
+     * parameter at the start of every likelihood and gradient pass (refreshTimeline), so they follow
+     * proposals and restores; break points out of order give a log likelihood of -infinity.
+     */
+    public void setupTimeline(Parameter breakPoints) {
+        if (breakPoints.getDimension() != numIntervals - 1) {
+            throw new IllegalArgumentException("breakPoints has dimension " + breakPoints.getDimension()
+                    + "; expected the number of intervals minus one (" + (numIntervals - 1) + ")");
+        }
+        this.breakPointsParameter = breakPoints;
+        addVariable(breakPoints);
+        this.modelStartTimes = new double[numIntervals];
+        refreshTimeline();
+    }
+
+    private void refreshTimeline() {
+        if (breakPointsParameter == null) {
+            return;
+        }
+        modelStartTimes[0] = 0.0;
+        timelineValid = true;
+        for (int k = 1; k < numIntervals; k++) {
+            modelStartTimes[k] = breakPointsParameter.getParameterValue(k - 1);
+            if (!(modelStartTimes[k] > modelStartTimes[k - 1])) {
+                timelineValid = false;
+            }
+        }
+    }
+
     // TODO should probably be replaced and brought in line with smoothSkygrid
     public void setupTimeline(double[] times) {
         if (this.modelStartTimes == null) {
@@ -391,6 +426,9 @@ public class EpisodicBirthDeathSamplingModel extends BirthDeathModel implements 
 
     @Override
     public double logConditioningProbability(int model) {
+        if (!timelineValid) {
+            return Double.NEGATIVE_INFINITY;              // break points out of order
+        }
         double logP = 0.0;
         if ( conditionOnSurvival ) {
             double origin = originTime.getParameterValue(0);
@@ -417,6 +455,7 @@ public class EpisodicBirthDeathSamplingModel extends BirthDeathModel implements 
     public double[] getBreakPoints() {
         // TODO Fix, this is all messed up; we should hold one set of values [0, ..., \infty]
         // TODO when fixing this, also fix EfficientSpeciationLikelihood.fixTimes()
+        refreshTimeline();
         double[] breakPoints = new double[numIntervals];
         System.arraycopy(modelStartTimes, 1, breakPoints, 0, numIntervals - 1);
 
@@ -450,7 +489,10 @@ public class EpisodicBirthDeathSamplingModel extends BirthDeathModel implements 
 
     @Override
     public void updateLikelihoodModelValues(int model) {
-        
+
+        if (model == 0) {
+            refreshTimeline();
+        }
         modelStartTime = modelStartTimes[model];
 
         if (model == 0) {
@@ -469,6 +511,9 @@ public class EpisodicBirthDeathSamplingModel extends BirthDeathModel implements 
     @Override
     public void updateGradientModelValues(int model) {
 
+        if (model == 0) {
+            refreshTimeline();
+        }
         modelStartTime = modelStartTimes[model];
 
         if (model == 0) {
@@ -513,6 +558,31 @@ public class EpisodicBirthDeathSamplingModel extends BirthDeathModel implements 
         }
         this.savedLogQ = logQ_old;
         return nLineages * (logQ_old - logQ_young);
+    }
+
+    /**
+     * d/dh of the tree log density for an internal node at height h. The node closes a likelihood interval
+     * with n lineages and opens one with n - 1 (the origin lineage above the root), so of the interval
+     * terms n (logQ_m(t_end) - logQ_m(t_start)) only d logQ_m(t)/dt at t = h survives, m being the segment
+     * containing h (assigned as in EfficientBirthDeathLikelihood: a time on a break point belongs to the
+     * older segment). log(lambda_m) and the tip terms do not depend on h. With
+     * logQ_m(t) = A tau + log 4 - 2 log((1 + B) e^(A tau) + 1 - B), tau = t - s_m:
+     *     d logQ_m / dt = A - 2 A (1 + B) e^(A tau) / ((1 + B) e^(A tau) + 1 - B).
+     * Not valid for sampled-ancestor (degree-two) nodes; jumps where a node crosses a break point with
+     * sampling probability > 0 are not differentiated.
+     */
+    @Override
+    public double getNodeHeightGradient(Tree tree, NodeRef node) {
+        final double t = tree.getNodeHeight(node);
+        refreshTimeline();
+        int model = 0;
+        updateLikelihoodModelValues(0);
+        while (model < numIntervals - 1 && t >= modelStartTimes[model + 1]) {
+            ++model;
+            updateLikelihoodModelValues(model);
+        }
+        final double eAt = Math.exp(A * (t - modelStartTimes[model]));
+        return A - 2.0 * A * (1.0 + B) * eAt / g1(eAt);
     }
 
     @Override

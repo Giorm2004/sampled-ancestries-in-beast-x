@@ -29,6 +29,7 @@ package dr.evomodelxml.birthdeath;
 
 import dr.evolution.util.Units;
 import dr.evomodel.birthdeath.EpisodicBirthDeathSamplingModel;
+import dr.evomodel.birthdeath.RemovalAwareBirthDeathRates;
 import dr.evoxml.util.XMLUnits;
 import dr.inference.model.Parameter;
 import dr.xml.*;
@@ -56,6 +57,10 @@ public class EpisodicBirthDeathSamplingModelParser extends AbstractXMLObjectPars
     public static final String S = "S";
     public static final String GRADIENT_FLAG = "gradientFlag";
     public static final String GRIDS = "grids";
+    public static final String BREAK_POINTS = "breakPoints";
+    public static final String REPRODUCTIVE_NUMBER = "reproductiveNumber";
+    public static final String BECOME_UNINFECTIOUS_RATE = "becomeUninfectiousRate";
+    public static final String SAMPLING_PROPORTION = "samplingProportion";
 
     public String getParserName() {
         return EPISODIC_BIRTH_DEATH_SAMPLING_MODEL;
@@ -68,6 +73,14 @@ public class EpisodicBirthDeathSamplingModelParser extends AbstractXMLObjectPars
         final Parameter numGridPoints = xo.hasChildNamed(NUM_GRID_POINTS) ? (Parameter) xo.getElementFirstChild(NUM_GRID_POINTS): new Parameter.Default(1.0);
         final Parameter cutoff = xo.hasChildNamed(CUT_OFF) ? (Parameter) xo.getElementFirstChild(CUT_OFF) : new Parameter.Default(Double.POSITIVE_INFINITY);
         final Parameter grids = xo.hasChildNamed(GRIDS) ? (Parameter) xo.getChild(GRIDS).getChild(Parameter.class) : null;
+        final Parameter breakPoints = xo.hasChildNamed(BREAK_POINTS) ? (Parameter) xo.getChild(BREAK_POINTS).getChild(Parameter.class) : null;
+        if (breakPoints != null && grids != null) {
+            throw new XMLParseException("give either " + GRIDS + " or " + BREAK_POINTS + ", not both");
+        }
+        final int numIntervals = breakPoints != null ? breakPoints.getDimension() + 1 : (int) numGridPoints.getParameterValue(0);
+        if (breakPoints != null && xo.hasChildNamed(NUM_GRID_POINTS) && (int) numGridPoints.getParameterValue(0) != numIntervals) {
+            throw new XMLParseException(NUM_GRID_POINTS + " must be the dimension of " + BREAK_POINTS + " plus one");
+        }
 
         Parameter lambda = null;
         Parameter mu = null;
@@ -82,7 +95,22 @@ public class EpisodicBirthDeathSamplingModelParser extends AbstractXMLObjectPars
         boolean[] gradientFlags = new boolean[5];
         Arrays.fill(gradientFlags, true);
 
-        if (xo.hasChildNamed(BIRTH_RATE)) {
+        RemovalAwareBirthDeathRates epiRates = null;
+
+        if (xo.hasChildNamed(REPRODUCTIVE_NUMBER)) {
+            // BDSKY's epidemiological parameterisation with removal probability (see RemovalAwareBirthDeathRates)
+            epiRates = new RemovalAwareBirthDeathRates(
+                    (Parameter) xo.getChild(REPRODUCTIVE_NUMBER).getChild(Parameter.class),
+                    (Parameter) xo.getChild(BECOME_UNINFECTIOUS_RATE).getChild(Parameter.class),
+                    (Parameter) xo.getChild(SAMPLING_PROPORTION).getChild(Parameter.class),
+                    (Parameter) xo.getChild(TREATMENT_PROBABILITY).getChild(Parameter.class),
+                    numIntervals);
+            lambda = epiRates.birthRate;
+            mu = epiRates.deathRate;
+            psi = epiRates.samplingRate;
+            Arrays.fill(gradientFlags, 0, 3, false);       // no gradients wrt R0, delta, s
+
+        } else if (xo.hasChildNamed(BIRTH_RATE)) {
 
             lambda = (Parameter) xo.getChild(BIRTH_RATE).getChild(Parameter.class);
             mu = (Parameter) xo.getChild(DEATH_RATE).getChild(Parameter.class);
@@ -133,24 +161,32 @@ public class EpisodicBirthDeathSamplingModelParser extends AbstractXMLObjectPars
             model = EpisodicBirthDeathSamplingModel.createWithCompoundParameters(
                     R0Parameter, DParameter, SParameter,
                     r, rho, originParameter,
-                    condition, (int)numGridPoints.getParameterValue(0), 
+                    condition, numIntervals,
                     cutoff.getParameterValue(0), units);
         } else {
             model = new EpisodicBirthDeathSamplingModel(lambda, mu, psi, r, rho, originParameter,
-                    condition, (int)(numGridPoints.getParameterValue(0)), 
+                    condition, numIntervals,
                     cutoff.getParameterValue(0), units);
         }
 
 
         model.setupGradientFlags(gradientFlags);
 
-        model.setupTimeline(grids != null ? grids.getParameterValues() : null);
+        if (breakPoints != null) {
+            model.setupTimeline(breakPoints);
+        } else {
+            model.setupTimeline(grids != null ? grids.getParameterValues() : null);
+        }
 
         Logger.getLogger("dr.evomodel").info("Using birth-death serial sampling model");
         Logger.getLogger("dr.evomodel").info("\tCondition on root: " + condition);
-        Logger.getLogger("dr.evomodel").info("\tGrid size: " + (int)numGridPoints.getParameterValue(0));
+        Logger.getLogger("dr.evomodel").info("\tGrid size: " + numIntervals);
         Logger.getLogger("dr.evomodel").info("\tGrid end: " + cutoff.getParameterValue(0));
-        Logger.getLogger("dr.evomodel").info("\tParameter mode: " + (R0Parameter != null ? "compound" : "raw"));
+        Logger.getLogger("dr.evomodel").info("\tParameter mode: " + (epiRates != null ? "epidemiological (BDSKY, removal-aware)"
+                : R0Parameter != null ? "compound" : "raw"));
+        if (breakPoints != null) {
+            Logger.getLogger("dr.evomodel").info("\tBreak points: parameter " + breakPoints.getId());
+        }
 
         return model;
     }
@@ -169,15 +205,23 @@ public class EpisodicBirthDeathSamplingModelParser extends AbstractXMLObjectPars
 
     private final XMLSyntaxRule[] rules = {
             AttributeRule.newBooleanRule(CONDITION, true),
-            new XORRule(
+            new XORRule(new XMLSyntaxRule[]{
                     new ElementRule(BIRTH_RATE,
                             new XMLSyntaxRule[]{
                                 new ElementRule(Parameter.class),
                                 AttributeRule.newBooleanRule(GRADIENT_FLAG, true)
                             }),
                     new ElementRule(R0,
+                            new XMLSyntaxRule[]{new ElementRule(Parameter.class)}),
+                    new ElementRule(REPRODUCTIVE_NUMBER,
                             new XMLSyntaxRule[]{new ElementRule(Parameter.class)})
-            ),
+            }),
+            new ElementRule(BECOME_UNINFECTIOUS_RATE,
+                    new XMLSyntaxRule[]{new ElementRule(Parameter.class)}, true),
+            new ElementRule(SAMPLING_PROPORTION,
+                    new XMLSyntaxRule[]{new ElementRule(Parameter.class)}, true),
+            new ElementRule(BREAK_POINTS,
+                    new XMLSyntaxRule[]{new ElementRule(Parameter.class)}, true),
             new ElementRule(DEATH_RATE,
                     new XMLSyntaxRule[]{
                         new ElementRule(Parameter.class),
