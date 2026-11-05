@@ -47,7 +47,10 @@ public class LogNormalDistributionModel extends AbstractModel implements
     public enum Parameterization {
         MU_SIGMA,
         MU_PRECISION,
-        MEAN_STDEV
+        MEAN_STDEV,
+        /** mean in real space, sigma (sd of the log) as is: mu = log(mean) - sigma^2 / 2. BEAST 2's
+         *  LogNormalDistributionModel with meanInRealSpace="true", e.g. its UCLN clock (M real-space, S log-space). */
+        MEAN_SIGMA
     }
 
     /**
@@ -127,6 +130,14 @@ public class LogNormalDistributionModel extends AbstractModel implements
                 this.precisionParameter = null;
                 this.parameterization = Parameterization.MEAN_STDEV;
                 break;
+            case MEAN_SIGMA:
+                this.meanParameter = parameter1;
+                this.sigmaParameter = parameter2;
+                this.muParameter = null;
+                this.stdevParameter = null;
+                this.precisionParameter = null;
+                this.parameterization = Parameterization.MEAN_SIGMA;
+                break;
             default:
                 throw new IllegalArgumentException("Unknow parameterization type");
         }
@@ -187,8 +198,11 @@ public class LogNormalDistributionModel extends AbstractModel implements
     public final double getMu() {
         if (muParameter != null) {
             return muParameter.getValue(0);
-        } else {
+        } else if (stdevParameter != null) {
             return calculateMu(meanParameter.getValue(0), stdevParameter.getValue(0));
+        } else {
+            final double sigma = getSigma();      // mean in real space with sigma or precision
+            return Math.log(meanParameter.getValue(0)) - 0.5 * sigma * sigma;
         }
     }
 
@@ -216,9 +230,9 @@ public class LogNormalDistributionModel extends AbstractModel implements
             return stdevParameter.getValue(0);
         } else if (precisionParameter != null) {
             double sigma = Math.sqrt(1.0 / precisionParameter.getValue(0));
-            return calculateStdev(muParameter.getValue(0), sigma);
+            return calculateStdev(getMu(), sigma);
         } else {
-            return calculateStdev(muParameter.getValue(0), sigmaParameter.getValue(0));
+            return calculateStdev(getMu(), sigmaParameter.getValue(0));
         }
     }
 

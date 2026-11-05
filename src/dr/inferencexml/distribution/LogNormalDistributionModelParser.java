@@ -64,14 +64,14 @@ public class LogNormalDistributionModelParser extends AbstractXMLObjectParser {
             }
 
             final boolean meanInRealSpace = xo.getAttribute(MEAN_IN_REAL_SPACE, false);
+            boolean meanAndSigma = false;
             if (xo.hasAttribute(STDEV_IN_REAL_SPACE)) {
                 boolean stdevInRealSpace = xo.getAttribute(STDEV_IN_REAL_SPACE, false);
                 if (!meanInRealSpace && stdevInRealSpace) {
                     throw new XMLParseException("Cannot parameterise Lognormal model with mu and stdev");
                 }
-                if (meanInRealSpace && !stdevInRealSpace) {
-                    throw new XMLParseException("Cannot parameterise Lognormal model with mean and sigma");
-                }
+                // real-space mean with log-space sigma: BEAST 2's meanInRealSpace convention (e.g. its UCLN clock)
+                meanAndSigma = meanInRealSpace && !stdevInRealSpace;
             }
 
             XMLObject cxo = xo.getChild(MEAN);
@@ -90,6 +90,10 @@ public class LogNormalDistributionModelParser extends AbstractXMLObjectParser {
                 stdevParam = new Parameter.Default(cxo.getDoubleChild(0));
             }
 
+            if (meanAndSigma) {
+                return new LogNormalDistributionModel(LogNormalDistributionModel.Parameterization.MEAN_SIGMA,
+                        meanParam, stdevParam, offset);
+            }
             return new LogNormalDistributionModel(meanParam, stdevParam, offset, meanInRealSpace);
         } else {
             // otherwise we decide the parameterization by which parameters are specified.
