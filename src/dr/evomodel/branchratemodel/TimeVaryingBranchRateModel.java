@@ -54,7 +54,7 @@ import java.util.List;
  */
 
 public class TimeVaryingBranchRateModel extends AbstractBranchRateModel
-        implements DifferentiableBranchRates, Citable {
+        implements DifferentiableBranchRates, TimeDependentBranchRates, Citable {
 
     private final Tree tree;
     private final Parameter rates;
@@ -134,6 +134,27 @@ public class TimeVaryingBranchRateModel extends AbstractBranchRateModel
         }
 
         return nodeRates[getParameterIndexFromNode(node)];
+    }
+
+    /**
+     * The instantaneous rate at a time (the same on every branch). Used for the node-height chain rule: a
+     * branch's length in substitutions is the integral of this rate, so moving a node at height h changes it at
+     * rate r(h), not at the branch's average rate.
+     */
+    @Override
+    public double getBranchRateAtTime(Tree tree, NodeRef node, double time) {
+        assert tree == this.tree;
+        double[] times = epochTimeProvider.getEpochTimes();
+        return functionalForm.instantaneousRate(epochAt(times, time), time, times);
+    }
+
+    /** The epoch containing time: the largest k with times[k] <= time (times[0] = 0). */
+    private static int epochAt(double[] times, double time) {
+        int k = times.length - 1;
+        while (k > 0 && times[k] > time) {
+            --k;
+        }
+        return k;
     }
 
     @Override
@@ -388,6 +409,8 @@ public class TimeVaryingBranchRateModel extends AbstractBranchRateModel
 
         double gradientWeight(int epochIndex, double startTime, double endTime, double branchLength);
 
+        /** The rate at a time inside epoch epochIndex. */
+        double instantaneousRate(int epochIndex, double time, double[] times);
 
 
         double getRateParameter(int epochIndex);
@@ -511,6 +534,11 @@ public class TimeVaryingBranchRateModel extends AbstractBranchRateModel
                 return timeLength / branchLength;
             }
 
+            @Override
+            public double instantaneousRate(int epochIndex, double time, double[] times) {
+                return getRateParameter(epochIndex);
+            }
+
         }
 
         class PiecewiseLogConstant extends PiecewiseConstant {
@@ -596,6 +624,14 @@ public class TimeVaryingBranchRateModel extends AbstractBranchRateModel
                 return 0;
             }
 
+            @Override
+            public double instantaneousRate(int epochIndex, double time, double[] times) {
+                double slope = epochIndex == getDimension() - 1 ? getSlope() :
+                        (getRateParameter(epochIndex) - getRateParameter(epochIndex + 1))
+                                / (times[epochIndex] - times[epochIndex + 1]);
+                return Math.exp(getRateParameter(epochIndex) + slope * (time - times[epochIndex]));
+            }
+
 
         }
 
@@ -643,6 +679,11 @@ public class TimeVaryingBranchRateModel extends AbstractBranchRateModel
                 return 0;
             }
 
+            @Override
+            public double instantaneousRate(int epochIndex, double time, double[] times) {
+                throw new UnsupportedOperationException("Not implemented for splines");
+            }
+
         }
 
 
@@ -665,7 +706,7 @@ public class TimeVaryingBranchRateModel extends AbstractBranchRateModel
         void increment(int epochIndex, int childIndex, double startTime, double endTime, double branchLength,
                        double[] times);
 
-        void store(int epochIndex, int nodeIndex, double branchLength);
+        void store(int epochIndex, int nodeIndex, double branchLength, double childHeight, double[] times);
 
         abstract class AbstractTraversal implements Traversal {
 
@@ -704,7 +745,7 @@ public class TimeVaryingBranchRateModel extends AbstractBranchRateModel
             }
 
             @Override
-            public void store(int epochIndex, int nodeIndex, double rate) { }
+            public void store(int epochIndex, int nodeIndex, double branchLength, double childHeight, double[] times) { }
         }
 
         class Rates extends AbstractTraversal {
@@ -723,8 +764,11 @@ public class TimeVaryingBranchRateModel extends AbstractBranchRateModel
             }
 
             @Override
-            public void store(int epochIndex, int nodeIndex, double branchLength) {
-                nodeRates[nodeIndex] = functionalForm.rateNumerator() / branchLength;
+            public void store(int epochIndex, int nodeIndex, double branchLength, double childHeight, double[] times) {
+                // A zero-length branch (a sampled ancestor's) has no average rate (0/0): use the rate at its time.
+                // It carries no substitutions either way.
+                nodeRates[nodeIndex] = branchLength > 0.0 ? functionalForm.rateNumerator() / branchLength :
+                        functionalForm.instantaneousRate(epochIndex, childHeight, times);
             }
         }
     }
@@ -765,7 +809,7 @@ public class TimeVaryingBranchRateModel extends AbstractBranchRateModel
             generic.increment(epochIndex, childIndex, currentHeight, childHeight, branchLength, times);
         }
 
-        generic.store(epochIndex, childIndex, branchLength);
+        generic.store(epochIndex, childIndex, branchLength, childHeight, times);
 
         if (!tree.isExternal(child)) {
             traverseTreeByBranchGeneric(times, childHeight, tree.getChild(child, 0), epochIndex, generic);

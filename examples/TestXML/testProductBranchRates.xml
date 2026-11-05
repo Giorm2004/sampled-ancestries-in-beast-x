@@ -1,0 +1,105 @@
+<?xml version="1.0" standalone="yes"?>
+<beast>
+    <!-- Product clock: relaxed (arbitraryBranchRates) x time-varying (timeVaryingRates, piecewise log-constant
+         on a grid that cuts the tree), in a binary-covarion TreeDataLikelihood (plain patterns, so this test does not
+         depend on the ascertainment branch), on a tree with two
+         sampled ancestors (a1, a4: zero-length branches). Random synthetic data (seeded). Gradients w.r.t. the
+         relaxed rates, the time-varying log-rates (through productBranchRateFactor) and the node heights are
+         checked against finite differences by test.dr.evomodel.branchratemodel.ProductBranchRateModelTest. -->
+    <taxa id="taxa">
+        <taxon id="m0"><date value="0.0" direction="backwards" units="years"/></taxon>
+        <taxon id="m1"><date value="0.0" direction="backwards" units="years"/></taxon>
+        <taxon id="m2"><date value="0.0" direction="backwards" units="years"/></taxon>
+        <taxon id="m3"><date value="0.0" direction="backwards" units="years"/></taxon>
+        <taxon id="m4"><date value="0.0" direction="backwards" units="years"/></taxon>
+        <taxon id="m5"><date value="0.0" direction="backwards" units="years"/></taxon>
+        <taxon id="m6"><date value="0.0" direction="backwards" units="years"/></taxon>
+        <taxon id="m7"><date value="0.0" direction="backwards" units="years"/></taxon>
+        <taxon id="a0"><date value="0.3" direction="backwards" units="years"/></taxon>
+        <taxon id="a1"><date value="0.9" direction="backwards" units="years"/></taxon>
+        <taxon id="a2"><date value="1.5" direction="backwards" units="years"/></taxon>
+        <taxon id="a3"><date value="2.2" direction="backwards" units="years"/></taxon>
+        <taxon id="a4"><date value="3.0" direction="backwards" units="years"/></taxon>
+        <taxon id="a5"><date value="3.45" direction="backwards" units="years"/></taxon>
+    </taxa>
+    <alignment id="alignment" dataType="twoStateCovarion">
+        <sequence><taxon idref="m0"/>0111?01100?10?0?1011101??1?10110101?01?11110?111000110011000</sequence>
+        <sequence><taxon idref="m1"/>01111?1001110010101111111?000010?001110001001??1?00?11011001</sequence>
+        <sequence><taxon idref="m2"/>01111?111001110110111?010?01?10111101010?00001111010000011?0</sequence>
+        <sequence><taxon idref="m3"/>00010?011001?11?0?1111?1?0111001000011010?100011?01?1111000?</sequence>
+        <sequence><taxon idref="m4"/>011111100001001011110001110?000?0101?1100?011111100110?10111</sequence>
+        <sequence><taxon idref="m5"/>01001110111111100?0011000010101?011011111111011??0101011?100</sequence>
+        <sequence><taxon idref="m6"/>01?110101011?0011101?0100101110011001101110?00111011110010?1</sequence>
+        <sequence><taxon idref="m7"/>00?11000010?111?1100001011000?01?01111?001?00?1?00011000101?</sequence>
+        <sequence><taxon idref="a0"/>0000110101111100?011011?110111111100010?0??11111000100011100</sequence>
+        <sequence><taxon idref="a1"/>0110?01111??0?1?011101111100?1?10??101000101010?1000001?0011</sequence>
+        <sequence><taxon idref="a2"/>000?01000?110011?100?1?11101010?1?1000101100?1011?0100?01001</sequence>
+        <sequence><taxon idref="a3"/>01100101001101111101?1?110?10111101101101001?11?111010110110</sequence>
+        <sequence><taxon idref="a4"/>01100?101?0011111111011?1100111000010??101001110100?111?1010</sequence>
+        <sequence><taxon idref="a5"/>0100000??0011010?0?100111100?0010111?0111?000?11001100?01111</sequence>
+    </alignment>
+    <patterns id="patterns" from="2">
+        <alignment idref="alignment"/>
+    </patterns>
+    <newick id="tree0" usingDates="true">(a2:7.014000000000,(((a1:0.000000000000,(m3:0.400000000000,m4:0.400000000000):0.500000000000):1.184000000000,m6:2.084000000000):5.287000000000,((m2:5.433000000000,(m7:4.626000000000,a5:1.176000000000):0.807000000000):1.129000000000,(m0:4.749000000000,(a3:1.919000000000,((a4:0.000000000000,(a0:0.800000000000,m5:1.100000000000):1.900000000000):0.375000000000,m1:3.375000000000):0.744000000000):0.630000000000):1.813000000000):0.809000000000):1.143000000000);</newick>
+    <treeModel id="treeModel"><newick idref="tree0"/>
+        <rootHeight><parameter id="treeModel.rootHeight"/></rootHeight>
+        <nodeHeights internalNodes="true"><parameter id="treeModel.internalNodeHeights"/></nodeHeights>
+    </treeModel>
+    <!-- the sampled-ancestor birth-death prior; its likelihood also snaps the SA branches to exactly 0 -->
+    <episodicBirthDeathSamplingModel id="bdsky1" units="years" conditionOnSurvival="true" sampledAncestors="true">
+        <reproductiveNumber><parameter id="R0.1" value="1.5"/></reproductiveNumber>
+        <becomeUninfectiousRate><parameter id="delta.1" value="2.0"/></becomeUninfectiousRate>
+        <samplingProportion><parameter id="s.1" value="0.0 0.1 0.0"/></samplingProportion>
+        <treatmentProbability><parameter id="r.1" value="0.0 0.0 0.0"/></treatmentProbability>
+        <samplingProbability><parameter id="rho.1" value="0.2 0.0 0.0"/></samplingProbability>
+        <origin><parameter id="origin.1" value="9.2"/></origin>
+        <breakPoints><parameter id="window.1" value="0.02 4.401"/></breakPoints>
+    </episodicBirthDeathSamplingModel>
+    <birthDeathLikelihood id="bd1" useNewLoop="true"><model><episodicBirthDeathSamplingModel idref="bdsky1"/></model>
+        <tree><treeModel idref="treeModel"/></tree></birthDeathLikelihood>
+    <arbitraryBranchRates id="relaxed">
+        <rates><parameter id="relaxed.rates" value="1.2803 1.6076 0.6100 0.6960 1.6055 0.7538 1.0354 0.5504 0.5272 0.5603 1.5089 1.2589 0.4231 0.5339 1.6801 0.6136 0.6243 1.2853 0.9956 1.4292 0.7190 1.5634 0.7615 1.1742 1.3631 0.9586" lower="0"/></rates>
+        <treeModel idref="treeModel"/>
+    </arbitraryBranchRates>
+    <timeVaryingRates id="timeVarying" functionalForm="piecewiseLogConstant">
+        <treeModel idref="treeModel"/>
+        <rate><parameter id="timeVarying.logRates" value="-0.4 0.3 0.6 -0.2 0.1"/></rate>
+        <gridPoints><parameter id="timeVarying.grid" value="0.6 1.7 3.2 5.0"/></gridPoints>
+    </timeVaryingRates>
+    <productBranchRates id="clock">
+        <treeModel idref="treeModel"/>
+        <arbitraryBranchRates idref="relaxed"/>
+        <timeVaryingRates idref="timeVarying"/>
+    </productBranchRates>
+    <productBranchRateFactor id="relaxedFactor"><productBranchRates idref="clock"/><arbitraryBranchRates idref="relaxed"/></productBranchRateFactor>
+    <productBranchRateFactor id="timeVaryingFactor"><productBranchRates idref="clock"/><timeVaryingRates idref="timeVarying"/></productBranchRateFactor>
+    <binaryCovarionModel id="covarion" version="1">
+        <frequencies><parameter id="covarion.frequencies" value="0.7 0.3"/></frequencies>
+        <hiddenFrequencies><parameter id="covarion.hiddenFrequencies" value="0.6 0.4"/></hiddenFrequencies>
+        <alpha><parameter id="covarion.alpha" value="0.25"/></alpha>
+        <switchingRate><parameter id="covarion.switchingRate" value="0.8"/></switchingRate>
+    </binaryCovarionModel>
+    <siteModel id="siteModel"><substitutionModel><binaryCovarionModel idref="covarion"/></substitutionModel>
+        <mutationRate><parameter id="mu" value="0.9"/></mutationRate>
+        <gammaShape gammaCategories="4"><parameter id="alpha" value="0.6"/></gammaShape></siteModel>
+    <treeDataLikelihood id="tdl" useAmbiguities="true" usePreOrder="true" scalingScheme="always">
+        <patterns idref="patterns"/>
+        <treeModel idref="treeModel"/>
+        <siteModel idref="siteModel"/>
+        <productBranchRates idref="clock"/>
+    </treeDataLikelihood>
+    <treeLikelihood id="reference" useAmbiguities="true">
+        <patterns idref="patterns"/>
+        <treeModel idref="treeModel"/>
+        <siteModel idref="siteModel"/>
+        <productBranchRates idref="clock"/>
+    </treeLikelihood>
+    <branchRateGradient id="relaxedGradient" traitName="covarion">
+        <treeDataLikelihood idref="tdl"/><productBranchRateFactor idref="relaxedFactor"/>
+    </branchRateGradient>
+    <branchRateGradient id="timeVaryingGradient" traitName="covarion">
+        <treeDataLikelihood idref="tdl"/><productBranchRateFactor idref="timeVaryingFactor"/>
+    </branchRateGradient>
+    <nodeHeightGradient id="heightGradient" traitName="covarion"><treeDataLikelihood idref="tdl"/></nodeHeightGradient>
+</beast>

@@ -27,6 +27,8 @@
 
 package dr.evomodelxml.continuous.hmc;
 
+import dr.evomodel.branchratemodel.ProductBranchRateModel;
+
 import dr.evomodel.branchratemodel.*;
 import dr.evomodel.treedatalikelihood.BeagleDataLikelihoodDelegate;
 import dr.evomodel.treedatalikelihood.DataLikelihoodDelegate;
@@ -69,6 +71,12 @@ public class BranchRateGradientParser extends AbstractXMLObjectParser {
         boolean useHessian = xo.getAttribute(USE_HESSIAN, false);
 
         final Object child = xo.getChild(TreeDataLikelihood.class);
+        final ProductBranchRateModel.Factor factor =
+                (ProductBranchRateModel.Factor) xo.getChild(ProductBranchRateModel.Factor.class);
+
+        if (child != null && factor != null) {
+            return parseFactor((TreeDataLikelihood) child, factor, traitName, useHessian);
+        }
 
         if (child != null) {
             return parseTreeDataLikelihood((TreeDataLikelihood) child, traitName, useHessian);
@@ -101,6 +109,22 @@ public class BranchRateGradientParser extends AbstractXMLObjectParser {
                 throw new XMLParseException("All TreeDataLikelihoods must use the same BranchRateModel");
             }
         }
+    }
+
+    /** Gradient w.r.t. one factor of the likelihood's ProductBranchRateModel. */
+    private GradientWrtParameterProvider parseFactor(TreeDataLikelihood treeDataLikelihood,
+                                                     ProductBranchRateModel.Factor factor,
+                                                     String traitName,
+                                                     boolean useHessian) throws XMLParseException {
+        if (treeDataLikelihood.getBranchRateModel() != factor.getProduct()) {
+            throw new XMLParseException("The factor must belong to the likelihood's productBranchRates");
+        }
+        DataLikelihoodDelegate delegate = treeDataLikelihood.getDataLikelihoodDelegate();
+        if (!(delegate instanceof BeagleDataLikelihoodDelegate) || !((BeagleDataLikelihoodDelegate) delegate).isUsePreOrder()) {
+            throw new XMLParseException("Factor gradients need a BEAGLE TreeDataLikelihood with usePreOrder=\"true\"");
+        }
+        return new BranchRateGradientForDiscreteTrait(traitName, treeDataLikelihood,
+                (BeagleDataLikelihoodDelegate) delegate, factor.getRateParameter(), useHessian, factor);
     }
 
     private GradientWrtParameterProvider parseTreeDataLikelihood(TreeDataLikelihood treeDataLikelihood,
@@ -150,6 +174,7 @@ public class BranchRateGradientParser extends AbstractXMLObjectParser {
                     new ElementRule(TreeDataLikelihood.class),
                     new ElementRule(CompoundLikelihood.class)
             ),
+            new ElementRule(ProductBranchRateModel.Factor.class, true),
     };
 
     @Override

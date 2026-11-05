@@ -59,6 +59,7 @@ public class EfficientBirthDeathLikelihoodGradient extends AbstractModel
     private final TreeTrait gradientProvider;
 
     private boolean gradientKnown;
+    private boolean storedGradientKnown;
     private double[] gradient;
     private double[] storedGradient;
 
@@ -162,11 +163,15 @@ public class EfficientBirthDeathLikelihoodGradient extends AbstractModel
         throw new IllegalArgumentException("Unknown variable: " + variable.getId());
     }
 
+    // The cached gradient is valid only together with its flag: restoring the array without the flag could hand
+    // back null (nothing stored yet) or a gradient from an earlier state, and a history-dependent gradient breaks
+    // the reversibility of HMC.
     @Override
     protected void storeState() {
         if (wrtParameter == BirthDeathLikelihoodGradient.WrtParameter.NODE_HEIGHT) {
-            if (gradient != null) {
-                if (storedGradient == null) {
+            storedGradientKnown = gradientKnown && gradient != null;
+            if (storedGradientKnown) {
+                if (storedGradient == null || storedGradient.length != gradient.length) {
                     storedGradient = new double[gradient.length];
                 }
                 System.arraycopy(gradient, 0, storedGradient, 0, gradient.length);
@@ -180,6 +185,7 @@ public class EfficientBirthDeathLikelihoodGradient extends AbstractModel
             double[] tmp = gradient;
             gradient = storedGradient;
             storedGradient = tmp;
+            gradientKnown = storedGradientKnown;
         }
     }
 

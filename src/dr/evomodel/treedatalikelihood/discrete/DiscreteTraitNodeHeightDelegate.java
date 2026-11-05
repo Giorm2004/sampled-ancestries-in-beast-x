@@ -33,6 +33,7 @@ import dr.evolution.alignment.AscertainedSitePatterns;
 import dr.evolution.tree.NodeRef;
 import dr.evolution.tree.Tree;
 import dr.evomodel.branchratemodel.DifferentiableBranchRates;
+import dr.evomodel.branchratemodel.TimeDependentBranchRates;
 import dr.evomodel.treedatalikelihood.AscertainmentCorrection;
 import dr.evomodel.treedatalikelihood.BeagleDataLikelihoodDelegate;
 
@@ -58,6 +59,19 @@ public class DiscreteTraitNodeHeightDelegate extends DiscreteTraitBranchRateDele
         this.branchRates = branchRates;
     }
 
+    /**
+     * d(length in substitutions of the branch above branchNode) / d(height of end), up to sign: the branch's
+     * instantaneous rate at the height of end (its parent or its child). For rates that do not depend on time this
+     * is the branch rate. (The diagonal Hessian below still uses branch rates: it is exact only for time-constant
+     * rates, and serves preconditioning.)
+     */
+    private double rateAtNode(Tree tree, NodeRef branchNode, NodeRef end) {
+        if (branchRates instanceof TimeDependentBranchRates) {
+            return ((TimeDependentBranchRates) branchRates).getBranchRateAtTime(tree, branchNode, tree.getNodeHeight(end));
+        }
+        return branchRates.getBranchRate(tree, branchNode);
+    }
+
     protected int getGradientLength() {
         return tree.getInternalNodeCount();
     }
@@ -78,10 +92,10 @@ public class DiscreteTraitNodeHeightDelegate extends DiscreteTraitBranchRateDele
                 for (int j = 0; j < tree.getChildCount(node); j++) {
                     NodeRef childNode = tree.getChild(node, j);
                     final int childNodeIndex = getParameterIndex(childNode, tree);
-                    first[i] += branchGradient[childNodeIndex] * branchRates.getBranchRate(tree, childNode);
+                    first[i] += branchGradient[childNodeIndex] * rateAtNode(tree, childNode, node);
                 }
                 if (!tree.isRoot(node)) {
-                    first[i] -= branchGradient[getParameterIndex(node, tree)] * branchRates.getBranchRate(tree, node);
+                    first[i] -= branchGradient[getParameterIndex(node, tree)] * rateAtNode(tree, node, node);
                 }
             }
         }
