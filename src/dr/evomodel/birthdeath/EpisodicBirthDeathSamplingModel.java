@@ -698,7 +698,7 @@ public class EpisodicBirthDeathSamplingModel extends BirthDeathModel implements 
     @Override
     public double processOrigin(int model, double rootAge) {
         if (originTime.getValue(0) < rootAge) {
-            return Double.NaN;
+            return Double.NEGATIVE_INFINITY;              // root above the origin: outside the support (as BDSKY)
         } else {
             double[] modelBreakPoints = getBreakPoints();
             double logL = 0.0;
