@@ -76,6 +76,19 @@ public class DiscreteTraitBranchRateGradient
                                            BeagleDataLikelihoodDelegate likelihoodDelegate,
                                            Parameter rateParameter,
                                            boolean useHessian) {
+        this(traitName, treeDataLikelihood, likelihoodDelegate, rateParameter, useHessian, null);
+    }
+
+    /**
+     * rateModel, when given, replaces the likelihood's branch-rate model for the chain rule (e.g. one factor of a
+     * ProductBranchRateModel); the branch-length gradient still comes from the likelihood.
+     */
+    public DiscreteTraitBranchRateGradient(String traitName,
+                                           TreeDataLikelihood treeDataLikelihood,
+                                           BeagleDataLikelihoodDelegate likelihoodDelegate,
+                                           Parameter rateParameter,
+                                           boolean useHessian,
+                                           DifferentiableBranchRates rateModel) {
 
         assert (treeDataLikelihood != null);
 
@@ -85,7 +98,8 @@ public class DiscreteTraitBranchRateGradient
         this.useHessian = useHessian;
 
         BranchRateModel brm = treeDataLikelihood.getBranchRateModel();
-        this.branchRateModel = (brm instanceof DifferentiableBranchRates) ? (DifferentiableBranchRates) brm : null;
+        this.branchRateModel = rateModel != null ? rateModel :
+                (brm instanceof DifferentiableBranchRates) ? (DifferentiableBranchRates) brm : null;
 
         String name = getTraitName(traitName);
         TreeTrait test = treeDataLikelihood.getTreeTrait(name);

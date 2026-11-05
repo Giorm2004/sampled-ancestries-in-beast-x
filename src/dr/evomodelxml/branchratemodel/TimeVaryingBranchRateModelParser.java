@@ -79,7 +79,7 @@ public class TimeVaryingBranchRateModelParser extends AbstractXMLObjectParser {
 
     @Override
     public Class getReturnType() {
-        return TimeVaryingBranchRateModelParser.class;
+        return TimeVaryingBranchRateModel.class;
     }
 
     @Override
@@ -89,7 +89,7 @@ public class TimeVaryingBranchRateModelParser extends AbstractXMLObjectParser {
 
     private final XMLSyntaxRule[] rules = {
             new ElementRule(Tree.class),
-            new ElementRule(IntegratedTransformedSplines.class),
+            new ElementRule(IntegratedTransformedSplines.class, true),
             new ElementRule(RATES, new XMLSyntaxRule[]{
                     new ElementRule(Parameter.class)
             }),

@@ -48,6 +48,16 @@ public class BranchRateGradientForDiscreteTrait extends DiscreteTraitBranchRateG
         super(traitName, treeDataLikelihood, likelihoodDelegate, rateParameter, useHessian);
     }
 
+    /** Chain rule through rateModel (e.g. a ProductBranchRateModel.Factor) instead of the likelihood's model. */
+    public BranchRateGradientForDiscreteTrait(String traitName,
+                                              TreeDataLikelihood treeDataLikelihood,
+                                              BeagleDataLikelihoodDelegate likelihoodDelegate,
+                                              Parameter rateParameter,
+                                              boolean useHessian,
+                                              dr.evomodel.branchratemodel.DifferentiableBranchRates rateModel) {
+        super(traitName, treeDataLikelihood, likelihoodDelegate, rateParameter, useHessian, rateModel);
+    }
+
     @Override
     protected double getChainGradient(Tree tree, NodeRef node) {
         return branchRateModel.getBranchRateDifferential(tree, node) * tree.getBranchLength(node);
