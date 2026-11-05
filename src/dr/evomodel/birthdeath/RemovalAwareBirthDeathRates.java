@@ -95,6 +95,16 @@ public class RemovalAwareBirthDeathRates {
         };
     }
 
+    /**
+     * The sampled inputs R0, becomeUninfectiousRate and samplingProportion. The model using these rates must
+     * register them as its variables: BEAST X stores and restores only parameters that some model owns, and the
+     * derived rates are proxies with no state, so otherwise a rejected move would leave the proposed value in place.
+     * (The removal probability is the model's own treatmentProbability.)
+     */
+    public Parameter[] getInputParameters() {
+        return new Parameter[]{reproductiveNumber, becomeUninfectiousRate, samplingProportion};
+    }
+
     private double psi(int i) {
         double s = at(samplingProportion, i);
         return s * at(becomeUninfectiousRate, i) / (1.0 + (at(removalProbability, i) - 1.0) * s);
