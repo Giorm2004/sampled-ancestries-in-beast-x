@@ -171,6 +171,12 @@ public class EpisodicBirthDeathSamplingModelParser extends AbstractXMLObjectPars
         }
 
 
+        if (epiRates != null) {
+            for (Parameter p : epiRates.getInputParameters()) {
+                model.addVariable(p);       // so that MCMC stores and restores them (see getInputParameters)
+            }
+        }
+
         model.setupGradientFlags(gradientFlags);
         model.setSampledAncestors(xo.getAttribute(SAMPLED_ANCESTORS, false));
 

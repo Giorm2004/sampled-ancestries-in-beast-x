@@ -91,6 +91,30 @@ public class EpisodicBDSKYWindowTest extends TestCase {
         assertEquals(logL(3), logL(1), 1e-10);
     }
 
+    /**
+     * A rejected move must restore R0, delta, s and the break points. MCMC restores parameters only through the
+     * models that own them, so this calls exactly what it calls: storeModelState, change, restoreModelState.
+     */
+    public void testRejectedMovesAreRestored() {
+        dr.inference.model.Model model = (dr.inference.model.Model) get("bdsky1");
+        dr.inference.model.Model likelihood = (dr.inference.model.Model) get("bd1");
+        double before = logL(1);
+        for (String id : new String[]{"R0.1", "delta.1", "s.1", "window.1", "origin.1"}) {
+            Parameter p = (Parameter) get(id);
+            model.storeModelState();
+            likelihood.storeModelState();
+            int i = 0;
+            for (int k = 1; k < p.getDimension(); k++) {
+                if (p.getParameterValue(k) > p.getParameterValue(i)) i = k;     // a nonzero element
+            }
+            p.setParameterValue(i, p.getParameterValue(i) * (id.equals("window.1") ? 0.99 : 1.3));
+            assertTrue(id + " did not change the density", Math.abs(logL(1) - before) > 1e-6);
+            model.restoreModelState();
+            likelihood.restoreModelState();
+            assertEquals(id + " not restored", before, logL(1), 1e-12);
+        }
+    }
+
     public void testBreakPointsOutOfOrder() {
         Parameter window = (Parameter) get("window.1");
         window.setParameterValue(0, 5.0);          // above the second break point (4.401)
