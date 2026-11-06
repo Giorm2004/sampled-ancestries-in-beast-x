@@ -1,0 +1,28 @@
+<?xml version="1.0" standalone="yes"?>
+<beast>
+    <!-- Clade-age priors (normal; offset log-normal; uniform; two priors stacked on one clade) and their node-height
+         gradient, checked against finite differences by test.dr.evomodel.tree.TMRCAPriorGradientTest. -->
+    <taxa id="taxa"><taxon id="A"/><taxon id="B"/><taxon id="C"/><taxon id="D"/><taxon id="E"/></taxa>
+    <taxa id="AB"><taxon idref="A"/><taxon idref="B"/></taxa>
+    <taxa id="DE"><taxon idref="D"/><taxon idref="E"/></taxa>
+    <taxa id="CDE"><taxon idref="C"/><taxon idref="D"/><taxon idref="E"/></taxa>
+    <newick id="tree0">((A:1.0,B:1.0):2.0,(C:1.5,(D:0.5,E:0.5):1.0):1.5);</newick>
+    <treeModel id="treeModel"><newick idref="tree0"/>
+        <rootHeight><parameter id="treeModel.rootHeight"/></rootHeight>
+        <nodeHeights internalNodes="true"><parameter id="treeModel.internalNodeHeights"/></nodeHeights>
+    </treeModel>
+    <tmrcaStatistic id="tmrca.AB"><mrca><taxa idref="AB"/></mrca><treeModel idref="treeModel"/></tmrcaStatistic>
+    <tmrcaStatistic id="tmrca.DE"><mrca><taxa idref="DE"/></mrca><treeModel idref="treeModel"/></tmrcaStatistic>
+    <tmrcaStatistic id="tmrca.CDE"><mrca><taxa idref="CDE"/></mrca><treeModel idref="treeModel"/></tmrcaStatistic>
+    <tmrcaStatistic id="tmrca.root"><mrca><taxa idref="taxa"/></mrca><treeModel idref="treeModel"/></tmrcaStatistic>
+    <normalPrior id="p.AB" mean="1.1" stdev="0.2"><tmrcaStatistic idref="tmrca.AB"/></normalPrior>
+    <exponentialPrior id="p.AB2" mean="2.0" offset="0.5"><tmrcaStatistic idref="tmrca.AB"/></exponentialPrior>
+    <logNormalPrior id="p.DE" mu="-1.2" sigma="0.5" offset="0.2"><tmrcaStatistic idref="tmrca.DE"/></logNormalPrior>
+    <uniformPrior id="p.CDE" lower="1.0" upper="2.0"><tmrcaStatistic idref="tmrca.CDE"/></uniformPrior>
+    <normalPrior id="p.root" mean="3.5" stdev="0.4"><tmrcaStatistic idref="tmrca.root"/></normalPrior>
+    <tmrcaPriorGradient id="grad">
+        <treeModel idref="treeModel"/>
+        <normalPrior idref="p.AB"/><exponentialPrior idref="p.AB2"/><logNormalPrior idref="p.DE"/>
+        <uniformPrior idref="p.CDE"/><normalPrior idref="p.root"/>
+    </tmrcaPriorGradient>
+</beast>
