@@ -52,6 +52,7 @@ public class DeltaExchangeOperator extends AbstractAdaptableOperator {
         for (int i = 0; i < parameterWeights.length; i++) {
             parameterWeights[i] = 1;
         }
+        this.stepScale = stepScales(parameterWeights);
     }
 
     public DeltaExchangeOperator(Parameter parameter, int[] parameterWeights, double delta, double weight, boolean isIntegerOperator, AdaptationMode mode) {
@@ -63,6 +64,7 @@ public class DeltaExchangeOperator extends AbstractAdaptableOperator {
         setWeight(weight);
         this.isIntegerOperator = isIntegerOperator;
         this.parameterWeights = parameterWeights;
+        this.stepScale = stepScales(parameterWeights);
 
         if (isIntegerOperator && delta != Math.round(delta)) {
             throw new IllegalArgumentException("Can't be an integer operator if delta is not integer");
@@ -102,14 +104,14 @@ public class DeltaExchangeOperator extends AbstractAdaptableOperator {
             scalar2 = Math.round(scalar2 + d);
         } else {
 
-            // exchange a random delta
+            // exchange a random delta of the weighted sum: x1 -= d * wbar / w1, x2 += d * wbar / w2. The reverse move
+            // (dim2, dim1) uses the same d, so the proposal is symmetric for any weights. (The previous form,
+            // x1 -= d, x2 += d * w1 / w2, is not: its reverse needs d * w1 / w2 <= delta and has a different density,
+            // so with unequal weights it sampled a delta-dependent distortion of the target.) With equal weights the
+            // step scales are 1 and the move is unchanged.
             final double d = MathUtils.nextDouble() * delta;
-            scalar1 -= d;
-            if (parameterWeights[dim1] != parameterWeights[dim2]) {
-                scalar2 += d * (double) parameterWeights[dim1] / (double) parameterWeights[dim2];
-            } else {
-                scalar2 += d;
-            }
+            scalar1 -= d * stepScale[dim1];
+            scalar2 += d * stepScale[dim2];
 
         }
         Bounds<Double> bounds = parameter.getBounds();
@@ -153,10 +155,25 @@ public class DeltaExchangeOperator extends AbstractAdaptableOperator {
         return getOperatorName() + "(windowsize=" + delta + ")";
     }
 
+    /** wbar / w_k, so that a step of d in the weighted sum moves each component by d * wbar / w_k. */
+    private static double[] stepScales(int[] weights) {
+        double mean = 0.0;
+        for (int w : weights) {
+            mean += w;
+        }
+        mean /= weights.length;
+        double[] scale = new double[weights.length];
+        for (int k = 0; k < weights.length; k++) {
+            scale[k] = weights[k] == mean ? 1.0 : mean / weights[k];
+        }
+        return scale;
+    }
+
     // Private instance variables
 
     private Parameter parameter = null;
     private final int[] parameterWeights;
+    private final double[] stepScale;
     private double delta = 0.02;
     private boolean isIntegerOperator = false;
 }
