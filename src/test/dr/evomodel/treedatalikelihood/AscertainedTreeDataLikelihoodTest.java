@@ -81,6 +81,34 @@ public class AscertainedTreeDataLikelihoodTest extends TestCase {
         }
     }
 
+    /**
+     * A rejected move (store, change the substitution model, evaluate, restore) must leave the gradients exactly as
+     * they were. The ascertainment coefficients come from the pattern log likelihoods; BEAGLE's own site buffer
+     * still holds the rejected proposal's values after a restore, so they must come from state the delegate stores.
+     */
+    public void testGradientsAfterRejectedMove() {
+        Parameter alpha = (Parameter) get("covarion.alpha");
+        for (int p = 1; p <= 2; p++) {
+            dr.inference.model.Model model = (dr.inference.model.Model) get("tdl" + p);
+            Likelihood likelihood = (Likelihood) get("tdl" + p);
+            for (String id : new String[]{"rateGradient" + p, "heightGradient" + p}) {
+                GradientWrtParameterProvider provider = (GradientWrtParameterProvider) get(id);
+                likelihood.getLogLikelihood();
+                double[] before = provider.getGradientLogDensity();
+                model.storeModelState();
+                alpha.setParameterValue(0, 0.4);
+                likelihood.getLogLikelihood();
+                model.restoreModelState();
+                assertEquals(0.25, alpha.getParameterValue(0), 0.0);
+                double[] after = provider.getGradientLogDensity();
+                for (int i = 0; i < before.length; i++) {
+                    assertEquals(id + "[" + i + "] after a rejected move", before[i], after[i],
+                            1e-10 * (1.0 + Math.abs(before[i])));
+                }
+            }
+        }
+    }
+
     private static void checkDerivatives(GradientWrtParameterProvider provider, String label) {
         Parameter x = provider.getParameter();
         Likelihood likelihood = provider.getLikelihood();
