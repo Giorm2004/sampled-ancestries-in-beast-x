@@ -937,6 +937,15 @@ public class BeagleDataLikelihoodDelegate extends AbstractModel implements
 
         double logL = sumLogLikelihoods[0];
 
+        // keep this state's pattern log likelihoods: BEAGLE's own site buffer is overwritten by every evaluation,
+        // including proposals that are later rejected (see getSiteLogLikelihoods)
+        if (siteLogLikelihoods == null) {
+            siteLogLikelihoods = new double[patternCount];
+            storedSiteLogLikelihoods = new double[patternCount];
+        }
+        beagle.getSiteLogLikelihoods(siteLogLikelihoods);
+        siteLogLikelihoodsKnown = true;
+
         /*if (DEBUG) {
             System.out.println(logL);
             if (logL > -90000) {
@@ -947,7 +956,7 @@ public class BeagleDataLikelihoodDelegate extends AbstractModel implements
         if (patternList instanceof AscertainedSitePatterns && !Double.isNaN(logL) && !Double.isInfinite(logL)) {
             // condition on the ascertainment event: sum_k w_k (l_k - log R), see AscertainmentCorrection
             double logR = AscertainmentCorrection.logProbability((AscertainedSitePatterns) patternList,
-                    getSiteLogLikelihoods());
+                    siteLogLikelihoods);
             logL = Double.isNaN(logR) ? Double.NEGATIVE_INFINITY
                     : logL - logR * AscertainmentCorrection.totalWeight(patternWeights);
         }
@@ -1031,9 +1040,18 @@ public class BeagleDataLikelihoodDelegate extends AbstractModel implements
         return patternWeights;
     }
 
+    /**
+     * The pattern log likelihoods of the current state. They are copied at each evaluation and stored/restored with
+     * the delegate: after a rejected proposal BEAGLE's site buffer still holds the proposal's values, which made
+     * gradients that use them (e.g. the ascertainment correction) depend on the chain's history.
+     */
     public double[] getSiteLogLikelihoods(){
         double[] patternLogLikelihoods = new double[patternCount];
-        beagle.getSiteLogLikelihoods(patternLogLikelihoods);
+        if (siteLogLikelihoodsKnown) {
+            System.arraycopy(siteLogLikelihoods, 0, patternLogLikelihoods, 0, patternCount);
+        } else {
+            beagle.getSiteLogLikelihoods(patternLogLikelihoods);
+        }
         return patternLogLikelihoods;
     }
 
@@ -1110,6 +1128,11 @@ public class BeagleDataLikelihoodDelegate extends AbstractModel implements
 //            storedRescalingCount = rescalingCount;
         }
 
+        if (siteLogLikelihoods != null) {
+            System.arraycopy(siteLogLikelihoods, 0, storedSiteLogLikelihoods, 0, patternCount);
+        }
+        storedSiteLogLikelihoodsKnown = siteLogLikelihoodsKnown;
+
         // turn on double buffering flipping (may have been turned off to enable a rescale)
         flip = true;
 
@@ -1144,6 +1167,13 @@ public class BeagleDataLikelihoodDelegate extends AbstractModel implements
             scaleBufferIndices = tmp;
 //            rescalingCount = storedRescalingCount;
         }
+
+        if (siteLogLikelihoods != null) {
+            double[] tmp = siteLogLikelihoods;
+            siteLogLikelihoods = storedSiteLogLikelihoods;
+            storedSiteLogLikelihoods = tmp;
+        }
+        siteLogLikelihoodsKnown = storedSiteLogLikelihoodsKnown;
 
         isRestored = true;
 
@@ -1367,6 +1397,11 @@ public class BeagleDataLikelihoodDelegate extends AbstractModel implements
      * the pattern likelihoods
      */
     private double[] patternLogLikelihoods = null;
+
+    private double[] siteLogLikelihoods = null;
+    private double[] storedSiteLogLikelihoods = null;
+    private boolean siteLogLikelihoodsKnown = false;
+    private boolean storedSiteLogLikelihoodsKnown = false;
 
     /**
      * the number of rate categories
