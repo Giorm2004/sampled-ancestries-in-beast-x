@@ -134,6 +134,14 @@ public class DistributionLikelihood extends AbstractDistributionLikelihood imple
         return logL;
     }
 
+    /**
+     * The log density this likelihood would assign to a single data value x, with the offset and scale applied exactly
+     * as in calculateLogLikelihood (used to differentiate a prior on a statistic, e.g. a tmrca calibration).
+     */
+    public double logDensityAt(double x) {
+        return getLogPDF(x - offset, 0);
+    }
+
     protected double getLogPDF(double value, int i){
         return distribution.logPdf(value/scale) - Math.log(scale);
     }
